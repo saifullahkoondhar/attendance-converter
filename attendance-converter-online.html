@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Attendance to Biometric Status Converter</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --border: #e0ded6;
+  --border-strong: #c9c6ba;
+  --text-primary: #1c1c1a;
+  --text-secondary: #6b6a63;
+  --text-muted: #9c9a90;
+  --surface-1: #f7f6f1;
+  --surface-2: #ffffff;
+  --bg-accent: #e6f1fb;
+  --text-accent: #0c447c;
+  --bg-success: #eaf3de;
+  --text-success: #27500a;
+  --bg-danger: #fcebeb;
+  --text-danger: #791f1f;
+  --bg-warning: #faeeda;
+  --text-warning: #633806;
+  --radius: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --border: #3a3936; --border-strong: #4d4c47;
+    --text-primary: #f0efe9; --text-secondary: #b3b1a8; --text-muted: #86847a;
+    --surface-1: #232220; --surface-2: #2b2a27;
+    --bg-accent: #0c447c; --text-accent: #b5d4f4;
+    --bg-success: #27500a; --text-success: #c0dd97;
+    --bg-danger: #791f1f; --text-danger: #f7c1c1;
+    --bg-warning: #633806; --text-warning: #fac775;
+  }
+}
+:root[data-theme="dark"] {
+  --border: #3a3936; --border-strong: #4d4c47;
+  --text-primary: #f0efe9; --text-secondary: #b3b1a8; --text-muted: #86847a;
+  --surface-1: #232220; --surface-2: #2b2a27;
+  --bg-accent: #0c447c; --text-accent: #b5d4f4;
+  --bg-success: #27500a; --text-success: #c0dd97;
+  --bg-danger: #791f1f; --text-danger: #f7c1c1;
+  --bg-warning: #633806; --text-warning: #fac775;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--surface-1); color: var(--text-primary); }
+.wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+.sub { color: var(--text-secondary); font-size: 14px; margin: 0 0 28px; }
+.card { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; margin-bottom: 16px; }
+.step-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 14px; }
+.step-num { width: 20px; height: 20px; border-radius: 50%; background: var(--bg-accent); color: var(--text-accent); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+.dropzone { border: 1.5px dashed var(--border-strong); border-radius: var(--radius); padding: 28px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+.dropzone:hover, .dropzone.drag { border-color: var(--text-accent); background: var(--bg-accent); }
+.dropzone input { display: none; }
+.dz-icon { font-size: 28px; margin-bottom: 8px; }
+.dz-text { font-size: 14px; color: var(--text-secondary); }
+.dz-text b { color: var(--text-primary); }
+.filepill { display: flex; align-items: center; justify-content: space-between; background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: 14px; margin-top: 10px; }
+.filepill .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filepill button { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; padding: 4px 8px; }
+.filepill button:hover { color: var(--text-danger); }
+.summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
+.stat { background: var(--surface-1); border-radius: var(--radius); padding: 12px 14px; }
+.stat .num { font-size: 20px; font-weight: 600; }
+.stat .lbl { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+button.primary {
+  background: var(--text-primary); color: var(--surface-2); border: none;
+  border-radius: var(--radius); padding: 11px 20px; font-size: 14px; font-weight: 600;
+  cursor: pointer; width: 100%; margin-top: 18px;
+}
+button.primary:disabled { opacity: .4; cursor: not-allowed; }
+button.secondary {
+  background: transparent; color: var(--text-primary); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); padding: 11px 20px; font-size: 14px; font-weight: 600;
+  cursor: pointer; width: 100%; margin-top: 10px;
+}
+.msg-box { border-radius: var(--radius); padding: 12px 14px; font-size: 13px; margin-top: 14px; line-height: 1.5; }
+.msg-box.warn { background: var(--bg-warning); color: var(--text-warning); }
+.msg-box.err { background: var(--bg-danger); color: var(--text-danger); }
+.msg-box ul { margin: 6px 0 0; padding-left: 18px; }
+.msg-box li { margin-bottom: 2px; }
+.success-banner { display: flex; align-items: center; gap: 10px; background: var(--bg-success); color: var(--text-success); border-radius: var(--radius); padding: 12px 14px; font-size: 14px; font-weight: 500; margin-top: 6px; }
+.hidden { display: none !important; }
+.small-note { font-size: 12px; color: var(--text-muted); margin-top: 10px; line-height: 1.5; }
+a.link { color: var(--text-accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Attendance to Biometric Status converter</h1>
+  <p class="sub">Upload your Attendance Sheet and get a Biometric Status Excel file, formatted to your template.</p>
+
+  <div class="card">
+    <div class="step-label"><span class="step-num">1</span>Attendance sheet (required)</div>
+    <div id="dz-att" class="dropzone">
+      <div class="dz-icon"><i class="ti ti-file-spreadsheet"></i>📄</div>
+      <div class="dz-text"><b>Choose Excel file</b> or drag it here<br>.xls or .xlsx</div>
+      <input type="file" id="file-att" accept=".xls,.xlsx">
+    </div>
+    <div id="pill-att"></div>
+    <div id="att-summary"></div>
+  </div>
+
+  <div class="card">
+    <div class="step-label"><span class="step-num">2</span>Biometric status template (optional)</div>
+    <div id="dz-tmpl" class="dropzone">
+      <div class="dz-icon">📋</div>
+      <div class="dz-text"><b>Choose Excel file</b> or drag it here<br>Used to carry over Grant / Duty Station / Shift for employees already on file.</div>
+      <input type="file" id="file-tmpl" accept=".xlsx">
+    </div>
+    <div id="pill-tmpl"></div>
+    <div class="small-note">Output includes filter dropdowns on Sr.No / Name / Father's Name / Desig / Grant / grp / 6x6-24x7 / Duty Station / Shift. Colors, fonts and borders are kept simple rather than matching the template pixel-for-pixel — the Check In / Check Out data and H/A/LF statuses are exact.</div>
+  </div>
+
+  <div class="card">
+    <div class="step-label"><span class="step-num">3</span>Convert</div>
+    <button class="primary" id="btn-convert" disabled>Convert attendance</button>
+    <div id="convert-messages"></div>
+    <div id="convert-success" class="hidden">
+      <div class="success-banner"><span>✓</span><span id="success-text">Conversion completed successfully</span></div>
+      <button class="secondary" id="btn-download">Download Biometric Status Excel</button>
+    </div>
+  </div>
+
+  <div class="small-note" style="text-align:center">Files are processed entirely in your browser — nothing is uploaded anywhere.</div>
+</div>
+
+<script>
+let attFile = null, tmplFile = null;
+let attWorkbook = null, tmplWorkbook = null;
+let parsedResult = null;
+let generatedWorkbookBlob = null, generatedFilename = null;
+
+function setupDropzone(dzId, inputId, onFile) {
+  const dz = document.getElementById(dzId);
+  const input = document.getElementById(inputId);
+  dz.addEventListener('click', () => input.click());
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag');
+    if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; onFile(e.dataTransfer.files[0]); }
+  });
+  input.addEventListener('change', () => { if (input.files.length) onFile(input.files[0]); });
+}
+
+function showPill(pillId, dzId, file, onRemove) {
+  const pill = document.getElementById(pillId);
+  document.getElementById(dzId).classList.add('hidden');
+  pill.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'filepill';
+  const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = file.name;
+  const btn = document.createElement('button'); btn.textContent = 'Remove';
+  btn.onclick = () => { pill.innerHTML = ''; document.getElementById(dzId).classList.remove('hidden'); onRemove(); };
+  row.appendChild(nm); row.appendChild(btn);
+  pill.appendChild(row);
+}
+
+function readFileAsWorkbook(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array', cellText: true, cellDates: false });
+        resolve(wb);
+      } catch (err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+setupDropzone('dz-att', 'file-att', async file => {
+  attFile = file;
+  showPill('pill-att', 'dz-att', file, () => { attFile = null; attWorkbook = null; document.getElementById('att-summary').innerHTML=''; updateConvertState(); });
+  try {
+    attWorkbook = await readFileAsWorkbook(file);
+    renderAttSummary();
+  } catch (err) {
+    document.getElementById('att-summary').innerHTML =
+      '<div class="msg-box err">Could not read this file as an Excel attendance sheet: ' + escapeHtml(err.message) + '</div>';
+  }
+  updateConvertState();
+});
+
+setupDropzone('dz-tmpl', 'file-tmpl', async file => {
+  tmplFile = file;
+  showPill('pill-tmpl', 'dz-tmpl', file, () => { tmplFile = null; tmplWorkbook = null; });
+  try {
+    tmplWorkbook = await readFileAsWorkbook(file);
+  } catch (err) {
+    document.getElementById('pill-tmpl').innerHTML +=
+      '<div class="msg-box err">Could not read this template file: ' + escapeHtml(err.message) + '</div>';
+  }
+});
+
+function escapeHtml(s) {
+  const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+
+function updateConvertState() {
+  document.getElementById('btn-convert').disabled = !attWorkbook;
+  document.getElementById('convert-success').classList.add('hidden');
+  document.getElementById('convert-messages').innerHTML = '';
+}
+
+// ---------- Attendance sheet parsing ----------
+
+function findAttendanceSheet(workbook) {
+  // Prefer a sheet whose header row contains "Emp Name" or "Employee Name"
+  for (const name of workbook.SheetNames) {
+    const ws = workbook.Sheets[name];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+    for (let r = 0; r < Math.min(rows.length, 10); r++) {
+      const rowStr = rows[r].map(c => String(c).toLowerCase());
+      if (rowStr.some(c => c.includes('emp name') || c.includes('employee name'))) {
+        return { sheetName: name, rows, headerRowIdx: r };
+      }
+    }
+  }
+  // fallback: first sheet, assume header row 0
+  const name = workbook.SheetNames[0];
+  const ws = workbook.Sheets[name];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+  return { sheetName: name, rows, headerRowIdx: 0 };
+}
+
+// Some exports (HTML-based .xls saved from reporting tools) split the attendance
+// table and the "from / to" summary text across separate sheets/tables. Search
+// every sheet for the date-range text rather than assuming it's on the same
+// sheet as the attendance table.
+function extractDateRangeFromWorkbook(workbook) {
+  for (const name of workbook.SheetNames) {
+    const ws = workbook.Sheets[name];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+    const found = extractDateRangeFromSheet(rows);
+    if (found) return found;
+  }
+  return null;
+}
+
+const KNOWN_FIELD_PATTERNS = {
+  srNo: /^sr\.?\s*no\.?$/i,
+  name: /^emp(loyee)?\s*name$/i,
+  fatherName: /father'?s?\s*name/i,
+  department: /^department$/i,
+  desig: /^desig(nation)?$/i,
+  grant: /^grant$/i,
+};
+
+function classifyColumns(headerRow) {
+  const cols = { srNo: -1, name: -1, fatherName: -1, department: -1, desig: -1, grant: -1, dateCols: [] };
+  headerRow.forEach((raw, idx) => {
+    const hOrig = String(raw || '').trim();
+    if (!hOrig) return;
+    const h = hOrig.replace(/\s+/g, ' ');
+    for (const key in KNOWN_FIELD_PATTERNS) {
+      if (KNOWN_FIELD_PATTERNS[key].test(h)) { cols[key] = idx; return; }
+    }
+    // date-like header, e.g. "Sat 05", "05", "05-Sep", "Sat05", or the same wrapped onto two lines
+    const dateInfo = parseDateHeader(h);
+    if (dateInfo) cols.dateCols.push({ idx, label: h, day: dateInfo.day, weekday: dateInfo.weekday });
+  });
+  return cols;
+}
+
+function parseDateHeader(h) {
+  // Matches: "Sat 05", "Sat05", "05", "5", "05-Sep", "05 Sep", and the same with
+  // a newline instead of a space (some exports wrap the weekday/day onto two lines)
+  h = h.replace(/\s+/g, ' ').trim();
+  let m = h.match(/^([A-Za-z]{3})\s*0*?(\d{1,2})$/);
+  if (m) return { weekday: m[1], day: parseInt(m[2], 10) };
+  m = h.match(/^0*?(\d{1,2})$/);
+  if (m) return { weekday: null, day: parseInt(m[1], 10) };
+  m = h.match(/^0*?(\d{1,2})[\s\-\/](jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i);
+  if (m) return { weekday: null, day: parseInt(m[1], 10) };
+  return null;
+}
+
+function extractDateRangeFromSheet(rows) {
+  // Look for "Attendance Sheet from: DD/MM/YYYY, to: DD/MM/YYYY" in the first few rows
+  for (let r = 0; r < Math.min(rows.length, 6); r++) {
+    for (const cell of rows[r]) {
+      const s = String(cell || '');
+      const m = s.match(/from:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})[\s\S]*?to:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+      if (m) return { from: m[1], to: m[2], raw: s };
+    }
+  }
+  return null;
+}
+
+function normalizeName(name) {
+  return String(name || '')
+    .replace(/^(mr\.?|mrs\.?|ms\.?|dr\.?|syed|sd\.?)\s+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+// Parses a single attendance-cell record like: "P I:08:46:32 O:13:50:27 WH:05:03:55"
+// Returns { status: 'P'|'A'|'H'|'LF'|'OTHER', checkIn: 'HH:MM:SS'|null, checkOut: 'HH:MM:SS'|null, raw }
+function parseAttendanceCell(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (s === '') return { status: 'BLANK', checkIn: null, checkOut: null, raw: s };
+
+  const timeRe = /(\d{1,2}:\d{2}:\d{2})/g;
+
+  if (/^H$/i.test(s)) return { status: 'H', checkIn: null, checkOut: null, raw: s };
+  if (/^A$/i.test(s)) return { status: 'A', checkIn: null, checkOut: null, raw: s };
+  if (/^LF\b/i.test(s)) {
+    // LF I:- O:- WH:- (leave, times dashed out) -- still capture real times if present
+    const iMatch = s.match(/I:(\d{1,2}:\d{2}:\d{2})/);
+    const oMatch = s.match(/O:(\d{1,2}:\d{2}:\d{2})/);
+    return { status: 'LF', checkIn: iMatch ? iMatch[1] : null, checkOut: oMatch ? oMatch[1] : null, raw: s };
+  }
+
+  // Present record, e.g. "P I:08:46:32 O:13:50:27 WH:05:03:55"
+  const iMatch = s.match(/I:(\d{1,2}:\d{2}:\d{2})/);
+  const oMatch = s.match(/O:(\d{1,2}:\d{2}:\d{2})/);
+  if (iMatch || oMatch) {
+    return { status: 'P', checkIn: iMatch ? iMatch[1] : null, checkOut: oMatch ? oMatch[1] : null, raw: s };
+  }
+
+  // Unrecognized status text
+  return { status: 'OTHER', checkIn: null, checkOut: null, raw: s };
+}
+
+function parseAttendanceWorkbook(workbook) {
+  const { sheetName, rows, headerRowIdx } = findAttendanceSheet(workbook);
+  const dateRange = extractDateRangeFromWorkbook(workbook);
+  const headerRow = rows[headerRowIdx] || [];
+  const cols = classifyColumns(headerRow);
+
+  const warnings = [];
+  if (cols.name === -1) warnings.push('Could not find an "Emp Name" column — cannot proceed.');
+  if (cols.dateCols.length === 0) warnings.push('Could not find any attendance date columns.');
+
+  const employees = [];
+  const seenNames = new Map();
+  let unrecognizedStatusCount = 0;
+  let duplicateNameCount = 0;
+
+  for (let r = headerRowIdx + 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row || row.every(c => String(c || '').trim() === '')) continue;
+    const name = cols.name >= 0 ? String(row[cols.name] || '').trim() : '';
+    if (!name) continue;
+    // skip rows that look like summary/footer rows (no name but has data) -- already filtered above
+
+    const key = normalizeName(name);
+    if (seenNames.has(key)) duplicateNameCount++;
+    seenNames.set(key, true);
+
+    const emp = {
+      srNo: cols.srNo >= 0 ? row[cols.srNo] : '',
+      name: name,
+      fatherName: cols.fatherName >= 0 ? String(row[cols.fatherName] || '').trim() : '',
+      department: cols.department >= 0 ? String(row[cols.department] || '').trim() : '',
+      desig: cols.desig >= 0 ? String(row[cols.desig] || '').trim() : '',
+      grant: cols.grant >= 0 ? String(row[cols.grant] || '').trim() : '',
+      days: []
+    };
+
+    cols.dateCols.forEach(dc => {
+      const parsed = parseAttendanceCell(row[dc.idx]);
+      if (parsed.status === 'OTHER') unrecognizedStatusCount++;
+      emp.days.push({ day: dc.day, label: dc.label, ...parsed });
+    });
+
+    employees.push(emp);
+  }
+
+  // sort date columns by day-of-month using the detected sequence order (preserve original column order, not sorted by day number,
+  // since day numbers can wrap across month boundary, e.g. 21..31,1..19)
+  const dateColsInOrder = cols.dateCols; // already in column order
+
+  return {
+    sheetName, dateRange, employees, dateColsInOrder,
+    warnings, unrecognizedStatusCount, duplicateNameCount
+  };
+}
+
+function renderAttSummary() {
+  const result = parseAttendanceWorkbook(attWorkbook);
+  parsedResult = result;
+  const el = document.getElementById('att-summary');
+  let html = '';
+
+  if (result.warnings.length && result.employees.length === 0) {
+    html += '<div class="msg-box err"><b>Could not process this file</b><ul>' +
+      result.warnings.map(w => '<li>' + escapeHtml(w) + '</li>').join('') + '</ul></div>';
+    el.innerHTML = html;
+    updateConvertState();
+    return;
+  }
+
+  const dateRangeText = result.dateRange ? (result.dateRange.from + ' – ' + result.dateRange.to) : 'Not detected';
+
+  html += '<div class="summary-grid">' +
+    '<div class="stat"><div class="num">' + result.employees.length + '</div><div class="lbl">Employees</div></div>' +
+    '<div class="stat"><div class="num">' + result.dateColsInOrder.length + '</div><div class="lbl">Attendance dates</div></div>' +
+    '<div class="stat"><div class="num" style="font-size:14px">' + escapeHtml(dateRangeText) + '</div><div class="lbl">Date range</div></div>' +
+    '</div>';
+
+  const warns = [];
+  if (result.unrecognizedStatusCount > 0) warns.push(result.unrecognizedStatusCount + ' cell(s) had an unrecognized attendance status and were left blank.');
+  if (result.duplicateNameCount > 0) warns.push(result.duplicateNameCount + ' employee name(s) appeared more than once in the sheet.');
+  if (!result.dateRange) warns.push('Could not auto-detect the "Attendance Sheet from / to" date range text.');
+
+  if (warns.length) {
+    html += '<div class="msg-box warn"><b>Heads up</b><ul>' + warns.map(w => '<li>' + escapeHtml(w) + '</li>').join('') + '</ul></div>';
+  }
+
+  el.innerHTML = html;
+}
+
+// ---------- Template parsing (Bio Metric sheet) ----------
+
+function parseTemplateWorkbook(workbook) {
+  const sheetName = workbook.SheetNames.find(n => /bio\s*metric/i.test(n)) || workbook.SheetNames[0];
+  const ws = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+  // header rows: row0 = date numbers (0-indexed row 0 = excel row1), row1 = field/CheckIn/CheckOut headers
+  const headerRow = rows[1] || [];
+  const byNameLookup = new Map();
+  for (let r = 2; r < rows.length; r++) {
+    const row = rows[r];
+    const name = String(row[1] || '').trim(); // column B = Name
+    if (!name) continue;
+    byNameLookup.set(normalizeName(name), {
+      grant: row[4] || '',
+      grp: row[5] || '',
+      grp67: row[6] || '',
+      dutyStation: row[7] || '',
+      shift: row[8] || ''
+    });
+  }
+  return { sheetName, byNameLookup };
+}
+
+// ---------- Output generation ----------
+
+const OUTPUT_HEADERS = ['Sr.No', 'Name', "Father's Name", 'Desig', 'Grant', 'grp', '6x6/24x7', 'Duty Station', 'Shift'];
+
+function buildOutputWorkbook(attResult, tmplLookup) {
+  const aoa = [];
+  const merges = [];
+
+  // Row 1: title + date numbers over each Check In/Check Out pair
+  const titleRow = ['   BIOMETRIC STATUS'];
+  for (let i = 1; i < 9; i++) titleRow.push(null);
+  attResult.dateColsInOrder.forEach(dc => { titleRow.push(dc.day); titleRow.push(null); });
+  aoa.push(titleRow);
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 8 } });
+
+  // Row 2: field headers + Check In / Check Out pairs
+  const headerRow2 = OUTPUT_HEADERS.slice();
+  attResult.dateColsInOrder.forEach(() => { headerRow2.push('Check In'); headerRow2.push('Check Out'); });
+  aoa.push(headerRow2);
+
+  // Data rows
+  const missingFromTemplate = [];
+  attResult.employees.forEach((emp, idx) => {
+    const tmplInfo = tmplLookup ? tmplLookup.get(normalizeName(emp.name)) : null;
+    if (tmplLookup && !tmplInfo) missingFromTemplate.push(emp.name);
+
+    const row = [
+      emp.srNo || (idx + 1),
+      emp.name,
+      emp.fatherName,
+      emp.desig,
+      emp.grant || (tmplInfo ? tmplInfo.grant : ''),
+      tmplInfo ? tmplInfo.grp : '',
+      tmplInfo ? tmplInfo.grp67 : '',
+      tmplInfo ? tmplInfo.dutyStation : '',
+      tmplInfo ? tmplInfo.shift : ''
+    ];
+
+    emp.days.forEach(d => {
+      let inVal = '', outVal = '';
+      if (d.status === 'H') { inVal = 'H'; outVal = 'H'; }
+      else if (d.status === 'LF') { inVal = 'LF'; outVal = 'LF'; }
+      else if (d.status === 'A') { inVal = 'A'; outVal = 'A'; }
+      else if (d.status === 'P') {
+        inVal = d.checkIn ? ('I:' + d.checkIn) : '';
+        outVal = d.checkOut ? ('O:' + d.checkOut) : '';
+      } else if (d.status === 'BLANK' || d.status === 'OTHER') {
+        inVal = ''; outVal = '';
+      }
+      row.push(inVal);
+      row.push(outVal);
+    });
+
+    aoa.push(row);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges'] = merges;
+
+  // Column widths: employee info columns wider (matched to the template's own widths), date columns narrower
+  const cols = [];
+  const widths = [7, 32, 26, 28, 15, 8, 10, 18, 10];
+  widths.forEach(w => cols.push({ wch: w }));
+  attResult.dateColsInOrder.forEach(() => { cols.push({ wch: 11 }); cols.push({ wch: 11 }); });
+  ws['!cols'] = cols;
+
+  // AutoFilter with dropdown arrows on the employee-info columns (A..I), matching the template's
+  // filterable fields: Sr.No, Name, Father's Name, Desig, Grant, grp, 6x6/24x7, Duty Station, Shift.
+  // Row 2 is the filter header row (row 1 is the merged title band, which Excel can't filter on).
+  const lastEmpRow = 2 + attResult.employees.length;
+  ws['!autofilter'] = { ref: `A2:I${lastEmpRow}` };
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Bio Metric');
+
+  return { workbook: wb, missingFromTemplate };
+}
+
+function formatFilenameDate(dateStr) {
+  // dateStr like "05/09/2026" -> "05-09-2026"
+  if (!dateStr) return null;
+  return dateStr.replace(/\//g, '-');
+}
+
+document.getElementById('btn-convert').addEventListener('click', () => {
+  const msgEl = document.getElementById('convert-messages');
+  msgEl.innerHTML = '';
+  document.getElementById('convert-success').classList.add('hidden');
+
+  if (!attWorkbook) return;
+  const attResult = parseAttendanceWorkbook(attWorkbook);
+
+  if (attResult.employees.length === 0) {
+    msgEl.innerHTML = '<div class="msg-box err">No employees could be identified in the attendance sheet. Please check the file and try again.</div>';
+    return;
+  }
+
+  let tmplLookup = null;
+  let tmplParse = null;
+  if (tmplWorkbook) {
+    tmplParse = parseTemplateWorkbook(tmplWorkbook);
+    tmplLookup = tmplParse.byNameLookup;
+  }
+
+  const { workbook, missingFromTemplate } = buildOutputWorkbook(attResult, tmplLookup);
+
+  const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  generatedWorkbookBlob = new Blob([wbout], { type: 'application/octet-stream' });
+
+  let fromStr = attResult.dateRange ? formatFilenameDate(attResult.dateRange.from) : null;
+  let toStr = attResult.dateRange ? formatFilenameDate(attResult.dateRange.to) : null;
+  generatedFilename = (fromStr && toStr)
+    ? ('Biometric_Status_' + fromStr + '_to_' + toStr + '.xlsx')
+    : 'Biometric_Status.xlsx';
+
+  // warnings summary
+  const warnMsgs = [];
+  if (attResult.unrecognizedStatusCount > 0) warnMsgs.push(attResult.unrecognizedStatusCount + ' record(s) had an unrecognized attendance status and were left blank.');
+  if (attResult.duplicateNameCount > 0) warnMsgs.push(attResult.duplicateNameCount + ' employee name(s) appeared more than once — later rows were still included as separate entries.');
+  if (tmplLookup && missingFromTemplate.length > 0) {
+    warnMsgs.push(missingFromTemplate.length + ' employee(s) were not found in the template, so Grant / Duty Station / Shift were left blank for them: ' +
+      missingFromTemplate.slice(0, 5).map(escapeHtml).join(', ') + (missingFromTemplate.length > 5 ? ', …' : ''));
+  }
+
+  if (warnMsgs.length) {
+    msgEl.innerHTML = '<div class="msg-box warn"><b>Conversion completed with warnings</b><ul>' +
+      warnMsgs.map(w => '<li>' + w + '</li>').join('') + '</ul></div>';
+    document.getElementById('success-text').textContent = 'Conversion completed with warnings';
+  } else {
+    document.getElementById('success-text').textContent = 'Conversion completed successfully';
+  }
+
+  document.getElementById('convert-success').classList.remove('hidden');
+});
+
+document.getElementById('btn-download').addEventListener('click', async () => {
+  if (!generatedWorkbookBlob) return;
+  try {
+    const downloads = await claude.use('downloads');
+    if (downloads) {
+      const arrayBuf = await generatedWorkbookBlob.arrayBuffer();
+      await downloads.save({ filename: generatedFilename, data: arrayBuf });
+      return;
+    }
+  } catch (e) {}
+  // fallback: plain browser download
+  const url = URL.createObjectURL(generatedWorkbookBlob);
+  const a = document.createElement('a');
+  a.href = url; a.download = generatedFilename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+});
+</script>
+</body>
+</html>
